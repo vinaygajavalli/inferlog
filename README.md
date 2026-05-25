@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # inferlog
 
 An LLM chatbot with a production-shaped **inference logging and ingestion pipeline** behind it.
