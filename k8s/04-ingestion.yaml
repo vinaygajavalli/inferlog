@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion
+  namespace: inferlog
+spec:
+  replicas: 2 # stateless HTTP -> scale horizontally
+  selector:
+    matchLabels: { app: ingestion }
+  template:
+    metadata:
+      labels: { app: ingestion }
+    spec:
+      containers:
+        - name: ingestion
+          image: inferlog-ingestion:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: PORT, value: "4000" }
+            - name: REDIS_URL
+              valueFrom: { configMapKeyRef: { name: inferlog-config, key: REDIS_URL } }
+          ports: [{ containerPort: 4000 }]
+          readinessProbe:
+            httpGet: { path: /health, port: 4000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion
+  namespace: inferlog
+spec:
+  selector: { app: ingestion }
+  ports: [{ port: 4000, targetPort: 4000 }]

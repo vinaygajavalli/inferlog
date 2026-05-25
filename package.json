@@ -1,0 +1,14 @@
+{
+  "name": "inferlog",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.6.0",
+  "scripts": {
+    "build:sdk": "pnpm --filter @inferlog/logger build",
+    "build": "pnpm -r build",
+    "dev:ingestion": "pnpm --filter @inferlog/ingestion dev",
+    "dev:worker": "pnpm --filter @inferlog/worker dev",
+    "dev:web": "pnpm --filter @inferlog/web dev",
+    "typecheck": "pnpm -r exec tsc --noEmit"
+  }
+}

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: inferlog
+spec:
+  replicas: 2 # consumer group => each pod gets a disjoint slice of the stream
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels: { app: worker }
+    spec:
+      containers:
+        - name: worker
+          image: inferlog-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              valueFrom: { configMapKeyRef: { name: inferlog-config, key: REDIS_URL } }
+            - name: DATABASE_URL
+              valueFrom: { configMapKeyRef: { name: inferlog-config, key: DATABASE_URL } }
+            # HOSTNAME (pod name) is used as the consumer name; set automatically by k8s

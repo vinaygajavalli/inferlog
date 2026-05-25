@@ -1,0 +1,104 @@
+# inferlog — one-command local stack.
+#   docker compose up --build
+# Then open http://localhost:3000 (chat) and http://localhost:3000/dashboard.
+#
+# With no API keys set, the chat uses the keyless mock provider, so the entire
+# pipeline (chat -> SDK -> ingestion -> Redis -> worker -> Postgres -> dashboard)
+# is demoable offline. Drop an ANTHROPIC_API_KEY or OPENAI_API_KEY into a .env
+# file to use a real model — nothing else changes.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: inferlog
+      POSTGRES_PASSWORD: inferlog
+      POSTGRES_DB: inferlog
+    # Not published to the host — the other containers reach it over the compose
+    # network. Uncomment to inspect from the host (will fail if 5432 is in use):
+    # ports:
+    #   - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # schema is applied automatically on first boot
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inferlog -d inferlog"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    # Not published to the host (a local Redis on 6379 is common and would
+    # collide). The services reach it over the compose network. Uncomment to
+    # inspect from the host:
+    # ports:
+    #   - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: apps/ingestion/Dockerfile
+    environment:
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://inferlog:inferlog@postgres:5432/inferlog
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 1 # scale out: `docker compose up --scale worker=3`
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      DATABASE_URL: postgres://inferlog:inferlog@postgres:5432/inferlog
+      INGESTION_URL: http://ingestion:4000/v1/logs
+      # provider selection — set any of these in .env; leave all unset for mock.
+      # generic OpenAI-compatible slot (e.g. Gemini via OPENAI_BASE_URL):
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      PROVIDER_NAME: ${PROVIDER_NAME:-openai}
+      MODEL: ${MODEL:-}
+      # native + per-provider keys (each becomes selectable in the UI):
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      OPENAI_API_KEY_NATIVE: ${OPENAI_API_KEY_NATIVE:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ingestion:
+        condition: service_started
+
+volumes:
+  pgdata:

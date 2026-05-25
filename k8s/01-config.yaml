@@ -1,0 +1,35 @@
+# Non-secret config shared by the services.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferlog-config
+  namespace: inferlog
+data:
+  REDIS_URL: redis://redis:6379
+  DATABASE_URL: postgres://inferlog:inferlog@postgres:5432/inferlog
+  INGESTION_URL: http://ingestion:4000/v1/logs
+  # provider selection (mirrors docker-compose). Leave keys empty in the Secret
+  # below to run on the keyless mock provider.
+  OPENAI_BASE_URL: https://api.openai.com/v1
+  PROVIDER_NAME: openai
+---
+# Provider API keys. Empty => keyless mock provider, so the stack runs on k8s
+# with zero secrets. To use real models, fill these in (or replace with
+# `kubectl -n inferlog create secret generic inferlog-secrets --from-env-file=.env`).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: inferlog-secrets
+  namespace: inferlog
+type: Opaque
+stringData:
+  OPENAI_API_KEY: ""
+  MODEL: ""
+  ANTHROPIC_API_KEY: ""
+  GEMINI_API_KEY: ""
+  GROQ_API_KEY: ""
+  DEEPSEEK_API_KEY: ""
+  XAI_API_KEY: ""
+
+# NOTE: the Postgres bootstrap schema ConfigMap (inferlog-schema) lives in
+# 01-schema.yaml, generated verbatim from db/schema.sql so it can't drift.

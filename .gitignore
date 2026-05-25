@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+.env
+*.log
+.DS_Store
+.pnpm-store
+coverage
+
+inferlog-images.tar
+*.tar
+
+*.tar
